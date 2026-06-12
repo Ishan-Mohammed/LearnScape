@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Mail, Lock, User, Sparkles, ShieldAlert, ArrowRight, BookOpen } from "lucide-react";
+import { User as UserType } from "../types";
 
 interface LoginSignupProps {
-  onAuthSuccess: (userData: { name: string; email: string; learningInterest: string; preferredTrack: string }, rememberMe?: boolean) => void;
+  onAuthSuccess: (userData: { name: string; email: string; learningInterest: string; preferredTrack: string; userState?: UserType }, rememberMe?: boolean) => void;
 }
 
 export default function LoginSignup({ onAuthSuccess }: LoginSignupProps) {
@@ -14,6 +15,30 @@ export default function LoginSignup({ onAuthSuccess }: LoginSignupProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const getUsersList = (): any[] => {
+    const usersStr = localStorage.getItem("learnscape_users_list");
+    if (usersStr) {
+      try {
+        return JSON.parse(usersStr);
+      } catch (e) {
+        console.error("Failed parsing users list", e);
+      }
+    }
+    // Backwards compatibility for single user
+    const singleUserStr = localStorage.getItem("learnscape_registered_user");
+    if (singleUserStr) {
+      try {
+        const parsed = JSON.parse(singleUserStr);
+        if (parsed && parsed.email) {
+          return [parsed];
+        }
+      } catch (e) {
+        console.error("Failed parsing legacy user", e);
+      }
+    }
+    return [];
+  };
+
   const handleAction = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -24,34 +49,22 @@ export default function LoginSignup({ onAuthSuccess }: LoginSignupProps) {
         return;
       }
       
-      const savedRegString = localStorage.getItem("learnscape_registered_user");
-      if (savedRegString) {
-        try {
-          const savedReg = JSON.parse(savedRegString);
-          if (savedReg.email.toLowerCase() === email.toLowerCase()) {
-            if (savedReg.password === password) {
-              onAuthSuccess({
-                name: savedReg.name,
-                email: savedReg.email,
-                learningInterest: savedReg.learningInterest || "General Learning",
-                preferredTrack: savedReg.preferredTrack || "software-dev"
-              }, rememberMe);
-              return;
-            } else {
-              setErrorMsg("Incorrect password. Please try again.");
-              return;
-            }
-          } else {
-            setErrorMsg("No account found with this email. Please create an account first.");
-            return;
-          }
-        } catch (e) {
-          console.error("Failed parsing registered user", e);
-        }
-      }
+      const users = getUsersList();
+      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
-      setErrorMsg("No account found. Please create an account first.");
-      return;
+      if (foundUser && foundUser.password === password) {
+        onAuthSuccess({
+          name: foundUser.name,
+          email: foundUser.email,
+          learningInterest: foundUser.learningInterest || "General Learning",
+          preferredTrack: foundUser.preferredTrack || "software-dev",
+          userState: foundUser.userState
+        }, rememberMe);
+        return;
+      } else {
+        setErrorMsg("Invalid email or password. Please try again.");
+        return;
+      }
     } else {
       if (!name || !email || !password || !confirmPassword) {
         setErrorMsg("All fields are required. Please fill in all details.");
@@ -62,15 +75,25 @@ export default function LoginSignup({ onAuthSuccess }: LoginSignupProps) {
         return;
       }
 
-      // Save credentials in localStorage
-      const registrationDetails = {
+      const users = getUsersList();
+      const duplicateExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+      if (duplicateExists) {
+        setErrorMsg("An account with this email already exists. Please sign in.");
+        return;
+      }
+
+      // Create new user account in list
+      const newUserAccount = {
         name,
         email,
         password,
         learningInterest: "General Learning",
         preferredTrack: "software-dev"
       };
-      localStorage.setItem("learnscape_registered_user", JSON.stringify(registrationDetails));
+      
+      const updatedList = [...users, newUserAccount];
+      localStorage.setItem("learnscape_users_list", JSON.stringify(updatedList));
+      localStorage.setItem("learnscape_registered_user", JSON.stringify(newUserAccount));
 
       alert(`🎉 Account created successfully for ${name}!\n\nPlease sign in with your new email and password.`);
 

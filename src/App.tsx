@@ -9,7 +9,6 @@ import LandingHero from "./components/LandingHero";
 import TrackSelection from "./components/TrackSelection";
 import DuolingoRoadmap from "./components/DuolingoRoadmap";
 import ProgressDashboard from "./components/ProgressDashboard";
-import LearnScapeMentor from "./components/LearnScapeMentor";
 import WorkflowVisualization from "./components/WorkflowVisualization";
 import DatabaseERD from "./components/DatabaseERD";
 import AdminPanel from "./components/AdminPanel";
@@ -89,27 +88,53 @@ export default function App() {
     setUser(updatedUser);
     if (updatedUser) {
       localStorage.setItem("pf_user_session", JSON.stringify(updatedUser));
+      try {
+        const usersStr = localStorage.getItem("learnscape_users_list");
+        let users: any[] = [];
+        if (usersStr) {
+          users = JSON.parse(usersStr);
+        }
+        const idx = users.findIndex(u => u.email.toLowerCase() === updatedUser.email.toLowerCase());
+        if (idx !== -1) {
+          users[idx].userState = updatedUser;
+          users[idx].name = updatedUser.name;
+        } else {
+          users.push({
+            name: updatedUser.name,
+            email: updatedUser.email,
+            userState: updatedUser
+          });
+        }
+        localStorage.setItem("learnscape_users_list", JSON.stringify(users));
+      } catch (e) {
+        console.error("Failed saving state to users list", e);
+      }
     } else {
       localStorage.removeItem("pf_user_session");
     }
   };
 
-  const handleAuthSuccess = (userData: { name: string; email: string; learningInterest: string; preferredTrack: string }, rememberMe?: boolean) => {
-    const newUser: User = {
-      id: `student-${Date.now()}`,
-      name: userData.name,
-      email: userData.email,
-      learningInterest: userData.learningInterest,
-      preferredTrack: userData.preferredTrack,
-      xp: 0,
-      level: 1,
-      streak: 3, // Seeding a realistic beginner streak!
-      lastActive: new Date().toISOString(),
-      completedLessons: [],
-      completedModules: [],
-      quizScores: {},
-      joinedAt: new Date().toLocaleDateString()
-    };
+  const handleAuthSuccess = (userData: { name: string; email: string; learningInterest: string; preferredTrack: string; userState?: User }, rememberMe?: boolean) => {
+    let newUser: User;
+    if (userData.userState) {
+      newUser = userData.userState;
+    } else {
+      newUser = {
+        id: `student-${Date.now()}`,
+        name: userData.name,
+        email: userData.email,
+        learningInterest: userData.learningInterest,
+        preferredTrack: userData.preferredTrack,
+        xp: 0,
+        level: 1,
+        streak: 3, // Seeding a realistic beginner streak!
+        lastActive: new Date().toISOString(),
+        completedLessons: [],
+        completedModules: [],
+        quizScores: {},
+        joinedAt: new Date().toLocaleDateString()
+      };
+    }
 
     if (rememberMe) {
       localStorage.setItem("pf_remember_me", "true");
@@ -327,7 +352,6 @@ export default function App() {
                   { id: "tracks", label: "Learning Paths", icon: <Shuffle className="w-4 h-4" /> },
                   { id: "roadmap", label: "Learning Roadmap", icon: <Disc3 className="w-4 h-4 text-cyan-400" /> },
                   { id: "analytics", label: "Progress Dashboard", icon: <Trophy className="w-4 h-4 text-amber-500" /> },
-                  { id: "mentor", label: "Study Mentor", icon: <Bot className="w-4 h-4 text-rose-400" /> },
                   { id: "database", label: "Database Schema", icon: <Database className="w-4 h-4 text-cyan-400" /> }
                 ].map((item) => {
                   const isActive = activeTab === item.id;
@@ -409,7 +433,6 @@ export default function App() {
                     { id: "tracks", label: "Learning Paths", icon: <Shuffle className="w-4 h-4" /> },
                     { id: "roadmap", label: "Learning Roadmap", icon: <Disc3 className="w-4 h-4 text-cyan-400" /> },
                     { id: "analytics", label: "Progress Dashboard", icon: <Trophy className="w-4 h-4" /> },
-                    { id: "mentor", label: "Study Mentor", icon: <Bot className="w-4 h-4" /> },
                     { id: "database", label: "Database Schema", icon: <Database className="w-4 h-4" /> }
                   ].map((item) => (
                     <button
@@ -623,30 +646,9 @@ export default function App() {
 
                     </div>
 
-                    {/* 5. Study Mentor container (Right aspect) */}
+                    {/* 5. Overall Progress container (Right aspect) */}
                     <div className="space-y-6">
                       
-                      {/* Study Mentor panel link */}
-                      <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-4 flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 pb-2 border-b border-slate-900">
-                            <Bot className="w-5 h-5 text-rose-400" />
-                            <h4 className="text-sm font-bold text-white font-mono uppercase tracking-wider">Study Mentor</h4>
-                          </div>
-                          <p className="text-xs text-gray-400 leading-relaxed">
-                            Get help with lessons, study tips, and learning guidance.
-                          </p>
-                        </div>
-                        <div className="pt-4">
-                          <button
-                            onClick={() => setActiveTab("mentor")}
-                            className="w-full text-center py-2 border border-rose-500/20 hover:border-rose-400/50 bg-rose-950/10 text-rose-300 hover:text-white font-mono text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
-                          >
-                            Ask Mentor
-                          </button>
-                        </div>
-                      </div>
-
                       {/* Quick analytics reference (Progress Dashboard redirect) */}
                       <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-4 flex flex-col justify-between">
                         <div className="space-y-2">
@@ -709,18 +711,6 @@ export default function App() {
                 completedModulesCount={user.completedModules.length}
                 trackTitle={activeTrack.title}
                 quizScores={user.quizScores}
-              />
-            )}
-
-            {/* View E: Chatbot sidebar panel */}
-            {activeTab === "mentor" && (
-              <LearnScapeMentor
-                studentName={user.name}
-                activeTrackTitle={activeTrack.title}
-                xp={user.xp}
-                level={user.level}
-                streak={user.streak}
-                completedLessonsCount={user.completedLessons.length}
               />
             )}
 
