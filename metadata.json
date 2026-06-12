@@ -1,0 +1,8 @@
+{
+  "name": "LearnScape",
+  "description": "Learn. Grow. Unlock Your Future. A gamified student learning platform with personalized roadmaps, lessons, quizzes, interactive progress dashboards, and a smart AI study mentor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
